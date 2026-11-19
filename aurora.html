@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comercial Aurora · Atención al cliente</title>
+<style>
+:root{color-scheme:light;--ink:#172434;--muted:#505e6e;--navy:#142334;--line:#dbe2e9;--paper:#fff;--accent:#216550;--wash:#f3f6f8}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--wash);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+h1,h2,h3,p{margin:0}
+h1{font-size:clamp(26px,5vw,40px);letter-spacing:-.045em}
+h2{font-size:21px;letter-spacing:-.025em}
+header{background:var(--navy);color:white;padding:24px 0 30px;border-top:4px solid #66b39a}
+.wrap{width:min(1320px,calc(100% - 40px));margin:auto}
+.mast,.heading,.actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.mast{justify-content:space-between}
+.brand{color:#a7dcc9;font-weight:700;letter-spacing:.04em}
+.mast label{color:#e4edf4;min-width:200px}
+main{padding:24px 0 48px}
+.workspace{display:grid;grid-template-columns:minmax(270px,360px) minmax(0,1fr);gap:20px;align-items:start}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px;min-width:0}
+.session{display:grid;gap:10px;margin-bottom:20px}
+.heading{justify-content:space-between;margin-bottom:12px}
+form,.stack{display:grid;gap:12px}
+label{display:grid;gap:4px;font-weight:650;min-width:0}
+small,.muted{color:var(--muted);font-weight:400}
+input,select,textarea,button,.file{font:inherit}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid #aebbc7;border-radius:7px;background:white;color:var(--ink);min-width:0}
+textarea{resize:vertical;min-height:76px}
+button,.file{background:#fff;border:1px solid #aebbc7;border-radius:7px;color:var(--ink);padding:8px 12px;font-weight:650;cursor:pointer;text-align:center}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.file{position:relative;display:inline-block}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer;padding:0}
+.file:focus-within,:focus-visible{outline:3px solid #277eb0;outline-offset:2px}
+button:hover,.file:hover{filter:brightness(.94)}
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;text-align:left}
+th,td{padding:10px 8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+th{color:var(--muted);font-size:13px}
+td:first-child{white-space:nowrap}
+.ticket{border:0;background:transparent;color:#185d4a;text-decoration:underline;padding:4px 0}
+.badge{display:inline-block;border-radius:6px;padding:2px 7px;background:#eaf0f5;font-size:13px;font-weight:650}
+.badge.good{background:#e1f3e9;color:#185441}
+.badge.late{background:#fbe9e4;color:#8b3024}
+#dirty[data-dirty="true"]{color:#854c0d;font-weight:700}
+.feedback{min-height:1.5em;color:#216550}
+.feedback[data-error="true"]{color:#a12b25}
+#detail{margin-top:16px;overflow-wrap:anywhere}
+dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;margin:0}
+dt{font-weight:650}
+dd{margin:0;white-space:pre-wrap}
+ol{margin:0;padding-left:22px}
+li+li{margin-top:8px}
+li p{white-space:pre-wrap}
+@media(max-width:870px){.workspace{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:550px){.wrap{width:calc(100% - 24px)}.card{padding:14px}.filters{grid-template-columns:1fr}.mast label{width:100%}.table-wrap{margin:0 -4px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap mast">
+    <div><p class="brand">Comercial Aurora</p><h1>Solicitudes de atención</h1></div>
+    <label>Operador activo
+      <select id="operator"><option value="">Selecciona tu perfil</option></select>
+    </label>
+  </div>
+</header>
+<main class="wrap">
+  <section class="card session" aria-labelledby="session-title">
+    <div class="heading"><h2 id="session-title">Datos de la sesión</h2><span id="dirty" role="status"></span></div>
+    <div class="actions">
+      <label class="file">Importar clientes<input type="file" id="directory-file" accept=".csv,.json" aria-describedby="directory-help"></label>
+      <label class="file">Restaurar respaldo<input type="file" id="backup-file" accept=".json"></label>
+      <button id="export" type="button">Exportar respaldo</button>
+      <button id="example" type="button">Cargar clientes de ejemplo</button>
+    </div>
+    <small id="directory-help">Directorio JSON o CSV con los campos nit y razon_social. Exporta un respaldo para conservar los cambios al cerrar.</small>
+    <p id="session-message" class="feedback" role="status"></p>
+  </section>
+  <div class="workspace">
+    <section class="card" aria-labelledby="register-title">
+      <div class="heading"><h2 id="register-title">Nueva solicitud</h2></div>
+      <form id="register" novalidate>
+        <label>NIT del cliente
+          <input id="nit" name="nit" list="clients" autocomplete="off" required>
+          <datalist id="clients"></datalist>
+        </label>
+        <label>Razón social<input id="client-name" readonly placeholder="Selecciona un NIT del directorio"></label>
+        <label>Canal<select id="channel" name="channel" required></select></label>
+        <label>Tipo de solicitud<select id="category" name="category" required></select></label>
+        <label>Referencia de pedido <small>Opcional</small><input name="order"></label>
+        <label>Descripción<textarea id="description" name="description" required minlength="10"></textarea></label>
+        <button class="primary" type="submit">Radicar solicitud</button>
+        <p id="register-message" class="feedback" role="status"></p>
+      </form>
+    </section>
+    <section class="card" aria-labelledby="queue-title">
+      <div class="heading"><h2 id="queue-title">Bandeja de solicitudes</h2><span id="count" class="muted" role="status"></span></div>
+      <div class="filters">
+        <label>Buscar<input id="search" type="search" placeholder="Radicado, NIT o cliente"></label>
+        <label>Estado<select id="filter-state"></select></label>
+        <label>Responsable<select id="filter-agent"></select></label>
+      </div>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Resultados de solicitudes">
+        <table>
+          <thead><tr><th scope="col">Radicado</th><th scope="col">Cliente</th><th scope="col">Responsable</th><th scope="col">Estado</th></tr></thead>
+          <tbody id="results"></tbody>
+        </table>
+      </div>
+      <section id="detail" class="card stack" aria-label="Detalle de la solicitud" hidden></section>
+    </section>
+  </div>
+</main>
+<script>
+'use strict';
+
+const $ = id => document.getElementById(id);
+const agentIds = ['agente-1', 'agente-2', 'agente-3', 'agente-4'];
+const profileIds = [...agentIds, 'coordinador'];
+const profiles = Object.fromEntries([
+  ...agentIds.map((id, index) => [id, `Agente ${index + 1}`]),
+  ['coordinador', 'Coordinador']
+]);
+const states = ['Nuevo', 'En proceso', 'Pendiente logística', 'Pendiente ventas', 'Resuelto', 'Cerrado'];
+const channels = ['Teléfono', 'Correo electrónico', 'Mensajería'];
+const categories = ['Consulta de stock', 'Estado de pedido', 'Inconformidad de envío', 'Facturación o cobro', 'Devolución'];
+const hour = 3600000;
+const dateFormat = new Intl.DateTimeFormat('es-CO', {dateStyle:'medium', timeStyle:'medium'});
+const numberFormat = new Intl.NumberFormat('es-CO', {maximumFractionDigits:2});
+
+let session = {profiles, clients:[], tickets:[], counters:{}, nextAgent:0};
+let dirty = false;
+let selectedId = null;
+let fileOperation = false;
+
+function element(tag, value, className) {
+  const node = document.createElement(tag);
+  if (value !== undefined) node.textContent = value;
+  if (className) node.className = className;
+  return node;
+}
+
+function options(select, entries, placeholder) {
+  select.replaceChildren(new Option(placeholder, ''), ...entries.map(([value, label]) => new Option(label, value)));
+}
+
+function labels(values) {
+  return values.map(value => [value, value]);
+}
+
+function feedback(id, message, error = false) {
+  $(id).textContent = message;
+  $(id).dataset.error = String(error);
+}
+
+function renderDirty() {
+  $('dirty').textContent = dirty ? 'Cambios pendientes de exportar' : 'Sin cambios pendientes';
+  $('dirty').dataset.dirty = String(dirty);
+}
+
+function markDirty() {
+  dirty = true;
+  renderDirty();
+}
+
+function normalizeDirectory(rows) {
+  if (!Array.isArray(rows)) throw new Error('El directorio debe ser una lista de clientes.');
+  const seen = new Set();
+  return rows.map((row, index) => {
+    const nit = typeof row?.nit === 'string' ? row.nit.trim() : '';
+    const razon_social = typeof row?.razon_social === 'string' ? row.razon_social.trim() : '';
+    if (!nit || !razon_social) throw new Error(`Cliente ${index + 1}: indica el NIT como texto y la razón social.`);
+    if (seen.has(nit)) throw new Error(`El NIT ${nit} está duplicado.`);
+    seen.add(nit);
+    return {nit, razon_social};
+  });
+}
+
+function parseCsv(source) {
+  const header = source.split(/\r?\n|\r/, 1)[0];
+  const separator = header.includes(';') ? ';' : ',';
+  const rows = [];
+  let row = [];
+  let field = '';
+  let quoted = false;
+  let closed = false;
+  function finishField() {
+    row.push(field);
+    field = '';
+    closed = false;
+  }
+  function finishRow() {
+    finishField();
+    if (row.some(value => value.trim())) rows.push(row);
+    row = [];
+  }
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index];
+    if (quoted) {
+      if (char !== '"') field += char;
+      else if (source[index + 1] === '"') {
+        field += '"';
+        index++;
+      } else {
+        quoted = false;
+        closed = true;
+      }
+    } else if (char === separator) {
+      finishField();
+    } else if (char === '\r' || char === '\n') {
+      if (char === '\r' && source[index + 1] === '\n') index++;
+      finishRow();
+    } else if (char === '"' && !field && !closed) {
+      quoted = true;
+    } else if (char === '"' || closed) {
+      throw new Error('El CSV tiene comillas en una posición inválida.');
+    } else {
+      field += char;
+    }
+  }
+  if (quoted) throw new Error('El CSV tiene un campo entre comillas sin cerrar.');
+  finishRow();
+  const columns = rows.shift()?.map(value => value.trim().toLowerCase()) ?? [];
+  const nit = columns.indexOf('nit');
+  const name = columns.indexOf('razon_social');
+  if (nit < 0 || name < 0 || new Set(columns).size !== columns.length) {
+    throw new Error('El encabezado CSV debe incluir nit y razon_social.');
+  }
+  return rows.map((values, index) => {
+    if (values.length !== columns.length) throw new Error(`Cantidad de columnas inválida en la fila de datos ${index + 1}.`);
+    return {nit:values[nit], razon_social:values[name]};
+  });
+}
+
+function renderDirectory() {
+  $('clients').replaceChildren(...session.clients.map(client => new Option(client.razon_social, client.nit)));
+  $('example').hidden = session.clients.length > 0;
+  updateClient();
+}
+
+function currentClient() {
+  return session.clients.find(client => client.nit === $('nit').value.trim());
+}
+
+function updateClient() {
+  $('client-name').value = currentClient()?.razon_social ?? '';
+}
+
+function formError(message, control, text) {
+  feedback(message, text, true);
+  control.focus();
+}
+
+function monthOf(date) {
+  return `${String(date.getFullYear()).padStart(4, '0')}${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function register(event) {
+  event.preventDefault();
+  const actor = $('operator').value;
+  const client = currentClient();
+  const input = new FormData(event.currentTarget);
+  const channel = input.get('channel');
+  const category = input.get('category');
+  const description = input.get('description').trim();
+  if (!profileIds.includes(actor)) return formError('register-message', $('operator'), 'Selecciona el operador activo.');
+  if (!client) return formError('register-message', $('nit'), 'Selecciona un NIT del directorio.');
+  if (!channels.includes(channel)) return formError('register-message', $('channel'), 'Selecciona el canal de origen.');
+  if (!categories.includes(category)) return formError('register-message', $('category'), 'Selecciona el tipo de solicitud.');
+  if (description.length < 10) return formError('register-message', $('description'), 'Escribe una descripción de al menos 10 caracteres.');
+
+  const now = new Date();
+  const month = monthOf(now);
+  const sequence = (session.counters[month] ?? 0) + 1;
+  if (sequence > 9999) {
+    feedback('register-message', 'Se agotó el consecutivo de radicados de este mes.', true);
+    return;
+  }
+  const receivedAt = now.toISOString();
+  const id = `AUR-${month}-${String(sequence).padStart(4, '0')}`;
+  const ticket = {
+    id, receivedAt, client:{...client}, channel, category, description,
+    order:input.get('order').trim(), agent:agentIds[session.nextAgent], state:'Nuevo', resolvedAt:null,
+    history:[{at:receivedAt, actor, from:null, to:'Nuevo', comment:''}]
+  };
+  session.tickets.push(ticket);
+  session.counters[month] = sequence;
+  session.nextAgent = (session.nextAgent + 1) % agentIds.length;
+  markDirty();
+  event.currentTarget.reset();
+  updateClient();
+  selectedId = id;
+  renderQueue();
+  renderDetail();
+  feedback('register-message', `${id} asignado a ${profiles[ticket.agent]}.`);
+}
+
+function searchable(value) {
+  return value.toLocaleLowerCase('es').normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
+function renderQueue() {
+  const search = searchable($('search').value.trim());
+  const state = $('filter-state').value;
+  const agent = $('filter-agent').value;
+  const filtered = session.tickets.filter(ticket =>
+    (!state || state === ticket.state) && (!agent || agent === ticket.agent) &&
+    [ticket.id, ticket.client.nit, ticket.client.razon_social].some(value => searchable(value).includes(search))
+  );
+  $('count').textContent = `${filtered.length} de ${session.tickets.length}`;
+  const rows = filtered.reverse().map(ticket => {
+    const row = element('tr');
+    const button = element('button', ticket.id, 'ticket');
+    button.type = 'button';
+    button.addEventListener('click', () => {
+      selectedId = ticket.id;
+      renderDetail();
+      $('detail-title').focus();
+    });
+    const idCell = element('td');
+    idCell.append(button);
+    const stateCell = element('td');
+    stateCell.append(element('span', ticket.state, 'badge'));
+    row.append(idCell, element('td', ticket.client.razon_social), element('td', profiles[ticket.agent]), stateCell);
+    return row;
+  });
+  if (!rows.length) {
+    const row = element('tr');
+    const cell = element('td', session.tickets.length ? 'Ninguna solicitud coincide con los filtros.' : 'Aún no hay solicitudes radicadas.', 'muted');
+    cell.colSpan = 4;
+    row.append(cell);
+    rows.push(row);
+  }
+  $('results').replaceChildren(...rows);
+}
+
+function formatDate(iso) {
+  return dateFormat.format(new Date(iso));
+}
+
+function renderDetail() {
+  const detail = $('detail');
+  const ticket = session.tickets.find(item => item.id === selectedId);
+  detail.hidden = !ticket;
+  detail.replaceChildren();
+  if (!ticket) return;
+  const title = element('h3', ticket.id);
+  title.id = 'detail-title';
+  title.tabIndex = -1;
+  const fields = element('dl');
+  const entries = [
+    ['Cliente', `${ticket.client.razon_social} · ${ticket.client.nit}`],
+    ['Responsable', profiles[ticket.agent]], ['Estado', ticket.state],
+    ['Recepción', formatDate(ticket.receivedAt)], ['Canal', ticket.channel],
+    ['Tipo', ticket.category], ['Pedido', ticket.order || 'Sin referencia'], ['Descripción', ticket.description]
+  ];
+  if (ticket.resolvedAt) {
+    const elapsed = Date.parse(ticket.resolvedAt) - Date.parse(ticket.receivedAt);
+    entries.push(['Resolución', formatDate(ticket.resolvedAt)], ['Duración', `${numberFormat.format(elapsed / hour)} horas corridas`]);
+    const within = elapsed <= 48 * hour;
+    entries.push(['Plazo', element('span', within ? 'Cumple 48 horas' : 'Fuera de plazo', within ? 'badge good' : 'badge late')]);
+  } else {
+    entries.push(['Resolución', 'Pendiente de resolución'], ['Plazo', 'Sin resultado de cumplimiento']);
+  }
+  for (const [name, value] of entries) {
+    const item = element('dd');
+    item.append(value);
+    fields.append(element('dt', name), item);
+  }
+  const form = element('form');
+  const stateLabel = element('label', 'Nuevo estado');
+  const next = element('select');
+  next.id = 'next-state';
+  options(next, labels(states.filter(state => state !== ticket.state)), 'Selecciona un estado');
+  stateLabel.append(next);
+  const commentLabel = element('label', 'Comentario opcional');
+  const comment = element('textarea');
+  comment.id = 'comment';
+  commentLabel.append(comment);
+  const submit = element('button', 'Guardar estado', 'primary');
+  const message = element('p', '', 'feedback');
+  message.id = 'detail-message';
+  message.setAttribute('role', 'status');
+  form.append(stateLabel, commentLabel, submit, message);
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    updateTicket(ticket, next, comment.value.trim());
+  });
+  const history = element('ol');
+  for (const event of ticket.history) {
+    const transition = event.from === null ? `Radicación · ${event.to}` : `${event.from} → ${event.to}`;
+    const entry = element('li');
+    entry.append(element('strong', transition), element('p', `${formatDate(event.at)} · ${profiles[event.actor]}`, 'muted'));
+    if (event.comment) entry.append(element('p', event.comment));
+    history.append(entry);
+  }
+  detail.append(title, fields, form, element('h3', 'Historial'), history);
+}
+
+function updateTicket(ticket, next, comment) {
+  const actor = $('operator').value;
+  if (!profileIds.includes(actor)) return formError('detail-message', $('operator'), 'Selecciona el operador activo.');
+  const to = next.value;
+  if (!states.includes(to) || to === ticket.state) return formError('detail-message', next, 'Selecciona un estado distinto al actual.');
+  if (to === 'Cerrado' && !ticket.resolvedAt) return formError('detail-message', next, 'Resuelve la solicitud antes de cerrarla.');
+  const at = new Date().toISOString();
+  if (at < ticket.history.at(-1).at) {
+    feedback('detail-message', 'La hora actual es anterior al último evento. Verifica el reloj del equipo.', true);
+    return;
+  }
+  ticket.history.push({at, actor, from:ticket.state, to, comment});
+  ticket.state = to;
+  if (to === 'Resuelto' && !ticket.resolvedAt) ticket.resolvedAt = at;
+  markDirty();
+  renderQueue();
+  renderDetail();
+  $('detail-title').focus();
+  feedback('detail-message', 'Estado actualizado.');
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isTimestamp(value) {
+  if (typeof value !== 'string') return false;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date.toISOString() === value;
+}
+
+function validMonth(value) {
+  return /^\d{4}(0[1-9]|1[0-2])$/.test(value);
+}
+
+function parseBackup(backup) {
+  if (!isRecord(backup) || backup.version !== 1) throw new Error('La versión del respaldo no es compatible.');
+  const data = backup.session;
+  if (!isTimestamp(backup.exportedAt) || !isRecord(data) || !isRecord(data.profiles) ||
+      Object.keys(data.profiles).length !== profileIds.length ||
+      !profileIds.every(id => data.profiles[id] === profiles[id]) ||
+      !Array.isArray(data.tickets) || !isRecord(data.counters) ||
+      !Number.isInteger(data.nextAgent) || data.nextAgent < 0 || data.nextAgent >= agentIds.length) {
+    throw new Error('El respaldo está incompleto o contiene una configuración inválida.');
+  }
+  const clients = normalizeDirectory(data.clients);
+  const counters = {};
+  for (const [month, value] of Object.entries(data.counters)) {
+    if (!validMonth(month) || !Number.isInteger(value) || value < 0 || value > 9999) {
+      throw new Error('El respaldo tiene un consecutivo mensual inválido.');
+    }
+    counters[month] = value;
+  }
+  const seen = new Set();
+  for (const [index, ticket] of data.tickets.entries()) {
+    const parts = typeof ticket?.id === 'string' && /^AUR-(\d{6})-(\d{4})$/.exec(ticket.id);
+    if (!parts || !validMonth(parts[1]) || Number(parts[2]) < 1 ||
+        Number(parts[2]) > (counters[parts[1]] ?? 0) || seen.has(ticket.id) ||
+        !isTimestamp(ticket.receivedAt) || !channels.includes(ticket.channel) ||
+        !categories.includes(ticket.category) || typeof ticket.description !== 'string' ||
+        ticket.description.trim().length < 10 || typeof ticket.order !== 'string' ||
+        ticket.agent !== agentIds[index % agentIds.length] || !Array.isArray(ticket.history) ||
+        !ticket.history.length) {
+      throw new Error(`La solicitud ${index + 1} del respaldo es inválida.`);
+    }
+    normalizeDirectory([ticket.client]);
+    seen.add(ticket.id);
+    let previousState = null;
+    let previousTime = ticket.receivedAt;
+    let firstResolution = null;
+    for (const event of ticket.history) {
+      if (!isRecord(event) || !isTimestamp(event.at) || event.at < previousTime ||
+          !profileIds.includes(event.actor) || event.from !== previousState ||
+          !states.includes(event.to) || event.to === previousState || typeof event.comment !== 'string' ||
+          (previousState === null && (event.to !== 'Nuevo' || event.at !== ticket.receivedAt)) ||
+          (event.to === 'Cerrado' && !firstResolution)) {
+        throw new Error(`El historial de ${ticket.id} es inválido.`);
+      }
+      if (event.to === 'Resuelto' && !firstResolution) firstResolution = event.at;
+      previousState = event.to;
+      previousTime = event.at;
+    }
+    if (ticket.state !== previousState || ticket.resolvedAt !== firstResolution) {
+      throw new Error(`El estado o la resolución de ${ticket.id} no coincide con su historial.`);
+    }
+  }
+  if (data.nextAgent !== data.tickets.length % agentIds.length) throw new Error('La rotación del respaldo es incoherente.');
+  return {profiles, clients, tickets:data.tickets, counters, nextAgent:data.nextAgent};
+}
+
+function exportBackup() {
+  const exportedAt = new Date().toISOString();
+  const content = JSON.stringify({version:1, exportedAt, session}, null, 2);
+  const url = URL.createObjectURL(new Blob([content], {type:'application/json'}));
+  const link = element('a');
+  link.href = url;
+  link.download = `aurora-respaldo-${exportedAt.slice(0, 19).replace(/:/g, '-')}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  dirty = false;
+  renderDirty();
+  feedback('session-message', 'Descarga iniciada. Conserva el archivo JSON para recuperar la sesión.');
+}
+
+async function readFile(event, handle) {
+  const control = event.currentTarget;
+  const file = control.files[0];
+  control.value = '';
+  if (!file || fileOperation) return;
+  fileOperation = true;
+  try {
+    const source = (await file.text()).replace(/^\uFEFF/, '');
+    handle(source, file.name);
+  } catch (error) {
+    const message = error instanceof SyntaxError ? 'El archivo no contiene JSON válido.' : error.message;
+    feedback('session-message', message, true);
+  } finally {
+    fileOperation = false;
+  }
+}
+
+$('directory-file').addEventListener('change', event => readFile(event, (source, filename) => {
+  const clients = normalizeDirectory(/\.csv$/i.test(filename) ? parseCsv(source) : JSON.parse(source));
+  session.clients = clients;
+  markDirty();
+  renderDirectory();
+  const count = clients.length === 1 ? '1 cliente' : `${clients.length} clientes`;
+  feedback('session-message', `Directorio cargado: ${count}.`);
+}));
+
+$('example').addEventListener('click', () => {
+  if (fileOperation || session.clients.length) return;
+  session.clients = [
+    {nit:'900000001', razon_social:'Colegio Mirador (ejemplo)'},
+    {nit:'900000002', razon_social:'Papelería Horizonte (ejemplo)'}
+  ];
+  $('nit').value = session.clients[0].nit;
+  renderDirectory();
+  markDirty();
+  $('nit').focus();
+  feedback('session-message', 'Se cargaron dos clientes ficticios para probar la radicación.');
+});
+
+$('backup-file').addEventListener('change', event => readFile(event, source => {
+  const backup = JSON.parse(source);
+  const restored = parseBackup(backup);
+  if ((dirty || session.clients.length || session.tickets.length) &&
+      !window.confirm(`¿Reemplazar la sesión actual con el respaldo del ${formatDate(backup.exportedAt)}?`)) {
+    feedback('session-message', 'Restauración cancelada.');
+    return;
+  }
+  session = restored;
+  selectedId = null;
+  dirty = false;
+  $('register').reset();
+  $('search').value = '';
+  $('filter-state').value = '';
+  $('filter-agent').value = '';
+  feedback('register-message', '');
+  renderDirectory();
+  renderDirty();
+  renderQueue();
+  renderDetail();
+  feedback('session-message', `Respaldo restaurado: ${session.tickets.length} solicitudes.`);
+}));
+
+options($('operator'), Object.entries(profiles), 'Selecciona tu perfil');
+options($('channel'), labels(channels), 'Selecciona un canal');
+options($('category'), labels(categories), 'Selecciona un tipo');
+options($('filter-state'), labels(states), 'Todos los estados');
+options($('filter-agent'), agentIds.map(id => [id, profiles[id]]), 'Todos los agentes');
+$('nit').addEventListener('input', updateClient);
+$('register').addEventListener('submit', register);
+$('search').addEventListener('input', renderQueue);
+$('filter-state').addEventListener('change', renderQueue);
+$('filter-agent').addEventListener('change', renderQueue);
+$('export').addEventListener('click', exportBackup);
+renderDirty();
+renderDirectory();
+renderQueue();
+renderDetail();
+</script>
+</body>
+</html>
