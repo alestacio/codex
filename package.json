@@ -1,0 +1,10 @@
+{
+  "name": "codex",
+  "private": true,
+  "scripts": {
+    "openspec": "openspec"
+  },
+  "devDependencies": {
+    "@fission-ai/openspec": "2.1.0"
+  }
+}
