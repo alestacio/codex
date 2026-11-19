@@ -22,6 +22,13 @@ main{padding:24px 0 48px}
 .workspace{display:grid;grid-template-columns:minmax(270px,360px) minmax(0,1fr);gap:20px;align-items:start}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px;min-width:0}
 .session{display:grid;gap:10px;margin-bottom:20px}
+.dashboard{margin-bottom:20px}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 8px}
+.metric{display:grid;gap:3px;text-align:left;padding:10px 12px;background:#f8fafb}
+.metric strong{font-size:clamp(22px,4vw,32px);line-height:1.15}
+.metric[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:#eaf5f0}
+.metric.overdue strong{color:#8b3024}
+.queue-state{display:flex;flex-wrap:wrap;gap:4px}
 .heading{justify-content:space-between;margin-bottom:12px}
 form,.stack{display:grid;gap:12px}
 label{display:grid;gap:4px;font-weight:650;min-width:0}
@@ -80,6 +87,21 @@ li p{white-space:pre-wrap}
     <small id="directory-help">Directorio JSON o CSV con los campos nit y razon_social. Exporta un respaldo para conservar los cambios al cerrar.</small>
     <p id="session-message" class="feedback" role="status"></p>
   </section>
+  <section class="card dashboard" aria-labelledby="dashboard-title">
+    <h2 id="dashboard-title">Panel de solicitudes</h2>
+    <div class="metrics" role="group" aria-label="Filtrar la bandeja por situación">
+      <button class="metric" type="button" data-scope="all" aria-controls="results" aria-pressed="true">
+        Total<strong id="metric-all">0</strong>
+      </button>
+      <button class="metric" type="button" data-scope="open" aria-controls="results" aria-pressed="false">
+        Abiertas<strong id="metric-open">0</strong>
+      </button>
+      <button class="metric overdue" type="button" data-scope="overdue" aria-controls="results" aria-pressed="false">
+        Vencidas<strong id="metric-overdue">0</strong>
+      </button>
+    </div>
+    <small>Selecciona un indicador para filtrar la bandeja. Las solicitudes abiertas vencen al superar 48 horas corridas.</small>
+  </section>
   <div class="workspace">
     <section class="card" aria-labelledby="register-title">
       <div class="heading"><h2 id="register-title">Nueva solicitud</h2></div>
@@ -98,7 +120,7 @@ li p{white-space:pre-wrap}
       </form>
     </section>
     <section class="card" aria-labelledby="queue-title">
-      <div class="heading"><h2 id="queue-title">Bandeja de solicitudes</h2><span id="count" class="muted" role="status"></span></div>
+      <div class="heading"><h2 id="queue-title" tabindex="-1">Bandeja de solicitudes</h2><span id="count" class="muted" role="status"></span></div>
       <div class="filters">
         <label>Buscar<input id="search" type="search" placeholder="Radicado, NIT o cliente"></label>
         <label>Estado<select id="filter-state"></select></label>
@@ -128,6 +150,7 @@ const states = ['Nuevo', 'En proceso', 'Pendiente logística', 'Pendiente ventas
 const channels = ['Teléfono', 'Correo electrónico', 'Mensajería'];
 const categories = ['Consulta de stock', 'Estado de pedido', 'Inconformidad de envío', 'Facturación o cobro', 'Devolución'];
 const hour = 3600000;
+const deadline = 48 * hour;
 const dateFormat = new Intl.DateTimeFormat('es-CO', {dateStyle:'medium', timeStyle:'medium'});
 const numberFormat = new Intl.NumberFormat('es-CO', {maximumFractionDigits:2});
 
@@ -135,6 +158,8 @@ let session = {profiles, clients:[], tickets:[], counters:{}, nextAgent:0};
 let dirty = false;
 let selectedId = null;
 let fileOperation = false;
+let queueScope = 'all';
+const metrics = document.querySelectorAll('.metric');
 
 function element(tag, value, className) {
   const node = document.createElement(tag);
@@ -302,11 +327,33 @@ function searchable(value) {
   return value.toLocaleLowerCase('es').normalize('NFD').replace(/\p{Diacritic}/gu, '');
 }
 
+function isOpen(ticket) {
+  return ticket.state !== 'Resuelto' && ticket.state !== 'Cerrado';
+}
+
+function isOverdue(ticket, now) {
+  return isOpen(ticket) && now - Date.parse(ticket.receivedAt) > deadline;
+}
+
+function setQueueScope(scope) {
+  queueScope = scope;
+  for (const metric of metrics) {
+    metric.setAttribute('aria-pressed', String(metric.dataset.scope === scope));
+  }
+}
+
 function renderQueue() {
+  const now = Date.now();
+  const open = session.tickets.filter(isOpen);
+  const overdue = new Set(open.filter(ticket => isOverdue(ticket, now)).map(ticket => ticket.id));
+  $('metric-all').textContent = session.tickets.length;
+  $('metric-open').textContent = open.length;
+  $('metric-overdue').textContent = overdue.size;
   const search = searchable($('search').value.trim());
   const state = $('filter-state').value;
   const agent = $('filter-agent').value;
   const filtered = session.tickets.filter(ticket =>
+    (queueScope !== 'open' || isOpen(ticket)) && (queueScope !== 'overdue' || overdue.has(ticket.id)) &&
     (!state || state === ticket.state) && (!agent || agent === ticket.agent) &&
     [ticket.id, ticket.client.nit, ticket.client.razon_social].some(value => searchable(value).includes(search))
   );
@@ -323,7 +370,10 @@ function renderQueue() {
     const idCell = element('td');
     idCell.append(button);
     const stateCell = element('td');
-    stateCell.append(element('span', ticket.state, 'badge'));
+    const stateBadges = element('div', undefined, 'queue-state');
+    stateBadges.append(element('span', ticket.state, 'badge'));
+    if (overdue.has(ticket.id)) stateBadges.append(element('span', 'Vencida', 'badge late'));
+    stateCell.append(stateBadges);
     row.append(idCell, element('td', ticket.client.razon_social), element('td', profiles[ticket.agent]), stateCell);
     return row;
   });
@@ -360,7 +410,7 @@ function renderDetail() {
   if (ticket.resolvedAt) {
     const elapsed = Date.parse(ticket.resolvedAt) - Date.parse(ticket.receivedAt);
     entries.push(['Resolución', formatDate(ticket.resolvedAt)], ['Duración', `${numberFormat.format(elapsed / hour)} horas corridas`]);
-    const within = elapsed <= 48 * hour;
+    const within = elapsed <= deadline;
     entries.push(['Plazo', element('span', within ? 'Cumple 48 horas' : 'Fuera de plazo', within ? 'badge good' : 'badge late')]);
   } else {
     entries.push(['Resolución', 'Pendiente de resolución'], ['Plazo', 'Sin resultado de cumplimiento']);
@@ -560,6 +610,7 @@ $('backup-file').addEventListener('change', event => readFile(event, source => {
   $('search').value = '';
   $('filter-state').value = '';
   $('filter-agent').value = '';
+  setQueueScope('all');
   feedback('register-message', '');
   renderDirectory();
   renderDirty();
@@ -578,6 +629,20 @@ $('register').addEventListener('submit', register);
 $('search').addEventListener('input', renderQueue);
 $('filter-state').addEventListener('change', renderQueue);
 $('filter-agent').addEventListener('change', renderQueue);
+for (const metric of metrics) {
+  metric.addEventListener('click', () => {
+    setQueueScope(metric.dataset.scope);
+    renderQueue();
+    $('queue-title').focus();
+  });
+}
+function refreshOverdue() {
+  const now = Date.now();
+  const count = session.tickets.filter(ticket => isOverdue(ticket, now)).length;
+  if (count !== Number($('metric-overdue').textContent)) renderQueue();
+}
+setInterval(refreshOverdue, 30000);
+window.addEventListener('focus', refreshOverdue);
 $('export').addEventListener('click', exportBackup);
 renderDirty();
 renderDirectory();
